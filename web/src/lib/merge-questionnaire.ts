@@ -1,0 +1,35 @@
+import type { QuestionnaireAnswers } from "@/lib/questionnaire-types";
+import { emptyQuestionnaire } from "@/lib/questionnaire-types";
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Deep-merge vendor JSON into the canonical questionnaire shape. */
+export function mergeQuestionnaireAnswers(patch: unknown): QuestionnaireAnswers {
+  const base = emptyQuestionnaire();
+  if (!isPlainObject(patch)) return base;
+
+  const merge = <T extends object>(b: T, p: unknown): T => {
+    if (!isPlainObject(p)) return b;
+    const out = { ...b } as Record<string, unknown>;
+    for (const key of Object.keys(b as object)) {
+      const bv = (b as Record<string, unknown>)[key];
+      const pv = p[key];
+      if (Array.isArray(bv)) {
+        out[key] = Array.isArray(pv) ? pv.filter((x) => typeof x === "string" || typeof x === "boolean") : bv;
+      } else if (isPlainObject(bv) && isPlainObject(pv)) {
+        out[key] = merge(bv as object, pv);
+      } else if (typeof bv === "boolean") {
+        out[key] = typeof pv === "boolean" ? pv : bv;
+      } else if (typeof bv === "string") {
+        out[key] = typeof pv === "string" ? pv : bv;
+      } else {
+        out[key] = pv !== undefined ? pv : bv;
+      }
+    }
+    return out as T;
+  };
+
+  return merge(base, patch) as QuestionnaireAnswers;
+}

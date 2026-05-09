@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SystemRecommendation {
+  APPROVE
+  REVIEW
+  NOT_RECOMMENDED
+}
+
+model Submission {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyName  String
+  contactName  String
+  contactEmail String
+
+  status SubmissionStatus @default(PENDING)
+
+  /// Full questionnaire payload (JSON)
+  answersJson String
+
+  /// 0–100, higher indicates more residual risk from answers
+  riskScore Int
+
+  /// Derived sensitivity label for the request
+  securityLevel String
+
+  recommendation SystemRecommendation
+
+  /// Structured rationale for admins (JSON)
+  analysisFactorsJson String
+
+  adminNotes String?
+  reviewedAt DateTime?
+}
