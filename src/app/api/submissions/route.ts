@@ -1,4 +1,8 @@
-import { analyzeSubmissionComplete, serializeAnalysisForStorage } from "@/lib/analyze-submission";
+import {
+  analyzeQuestionnaire,
+  analyzeSubmissionComplete,
+  serializeAnalysisForStorage,
+} from "@/lib/analyze-submission";
 import { prisma } from "@/lib/db";
 import { mergeQuestionnaireAnswers } from "@/lib/merge-questionnaire";
 import type { NextRequest } from "next/server";
@@ -19,7 +23,14 @@ export async function POST(req: NextRequest) {
     }
 
     const answers = mergeQuestionnaireAnswers(json.answers);
-    const analysis = await analyzeSubmissionComplete(answers);
+
+    let analysis;
+    try {
+      analysis = await analyzeSubmissionComplete(answers);
+    } catch (analysisErr) {
+      console.error("[submissions] analysis failed, using checklist-only fallback:", analysisErr);
+      analysis = analyzeQuestionnaire(answers);
+    }
 
     const row = await prisma.submission.create({
       data: {
@@ -41,7 +52,11 @@ export async function POST(req: NextRequest) {
       recommendation: analysis.recommendation,
     });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "Could not save submission." }, { status: 500 });
+    console.error("[submissions]", e);
+    const message =
+      process.env.NODE_ENV === "development" && e instanceof Error
+        ? `Could not save submission: ${e.message}`
+        : "Could not save submission.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

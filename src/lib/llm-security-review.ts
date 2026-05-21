@@ -12,8 +12,9 @@ type LlmJson = {
   risk_adjustment?: number;
   domain_scores?: Record<string, number>;
   institutional_interpretation?: string;
-  concerns?: { title?: string; detail?: string }[];
-  strengths?: { title?: string; detail?: string }[];
+  recommendation_rationale?: string;
+  concerns?: { title?: string; detail?: string; questionnaire_ref?: string }[];
+  strengths?: { title?: string; detail?: string; questionnaire_ref?: string }[];
   summary?: string;
 };
 
@@ -22,6 +23,7 @@ export type LlmReviewOutcome = {
   factors: LlmFactor[];
   domainScores?: Partial<Record<SecurityDomainId, number>>;
   institutionalInterpretation?: string;
+  recommendationRationale?: string;
 };
 
 function normalizeDomainKey(k: string): SecurityDomainId | null {
@@ -64,16 +66,17 @@ Respond with ONE JSON object (no markdown) with these keys:
 - "risk_adjustment": integer from -15 to +15 (positive = more overall residual risk than a neutral read).
 - "domain_scores": object whose keys are EXACTLY these seven strings, each mapped to an integer 0-100 (higher = more residual risk in that domain): ${SECURITY_DOMAIN_IDS.join(", ")}.
 - "institutional_interpretation": 2-4 sentences tying answers to university obligations and naming the highest-risk domains.
-- "concerns": array of up to 5 objects {"title","detail"}.
-- "strengths": array of up to 4 objects {"title","detail"}.
-- "summary": one paragraph for an admin dashboard.
+- "recommendation_rationale": 3-5 sentences explaining what an admin should conclude (approve with conditions, require remediation, or deny) based ONLY on the answers—reference specific sections (e.g. Section 5 encryption, Section 6 logging).
+- "concerns": array of up to 6 objects {"title","detail","questionnaire_ref"} where questionnaire_ref cites section/question (e.g. "Section 3.11 authentication").
+- "strengths": array of up to 5 objects {"title","detail","questionnaire_ref"} for controls or narratives that reduce risk.
+- "summary": one paragraph executive summary for the admin dashboard.
 
 Rules:
 - You MUST include all seven keys in domain_scores with the exact spelling above (uppercase with underscores).
 - Penalize **contradictions** (e.g. non-public data + weak encryption + Internet exposure + vague logging).
 - "Unsure" without mitigation narrative increases domain risk modestly.
 - Do not invent CVEs or confirmed breaches without explicit product/version in the JSON.
-- Max 5 concerns, 4 strengths.`;
+- Max 6 concerns, 5 strengths. Each concern/strength must be actionable for a human reviewer.`;
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -129,21 +132,25 @@ Rules:
       });
     }
 
-    for (const c of parsed.concerns?.slice(0, 5) ?? []) {
+    for (const c of parsed.concerns?.slice(0, 6) ?? []) {
       if (c.title?.trim()) {
+        const ref = c.questionnaire_ref?.trim();
+        const detail = (c.detail ?? "").trim() || "See questionnaire for context.";
         factors.push({
           kind: "concern",
           title: `AI review: ${c.title.trim()}`,
-          detail: (c.detail ?? "").trim() || "See questionnaire for context.",
+          detail: ref ? `${detail} (Source: ${ref})` : detail,
         });
       }
     }
-    for (const s of parsed.strengths?.slice(0, 4) ?? []) {
+    for (const s of parsed.strengths?.slice(0, 5) ?? []) {
       if (s.title?.trim()) {
+        const ref = s.questionnaire_ref?.trim();
+        const detail = (s.detail ?? "").trim() || "See questionnaire for context.";
         factors.push({
           kind: "strength",
           title: `AI review: ${s.title.trim()}`,
-          detail: (s.detail ?? "").trim() || "See questionnaire for context.",
+          detail: ref ? `${detail} (Source: ${ref})` : detail,
         });
       }
     }
@@ -157,6 +164,7 @@ Rules:
       factors,
       domainScores,
       institutionalInterpretation: interp,
+      recommendationRationale: parsed.recommendation_rationale?.trim(),
     };
   } catch (e) {
     console.error("[llm-security-review]", e);

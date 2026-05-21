@@ -103,5 +103,5 @@ export function buildChecklistInterpretation(scores: Record<SecurityDomainId, nu
     .map(([k, v]) => `${SECURITY_DOMAIN_COPY[k].title} (${v}/100)`)
     .join("; ");
 
-  return `Institutional (checklist) read: the questionnaire is designed to surface proportional controls before go-live. The strongest residual-risk themes by domain are: ${top}. These scores weight each section by why the university asks it—not character count alone—but they still reflect self-reported answers only, not verified testing. Configure OPENAI_API_KEY for an additional narrative cross-check grounded in the same institutional framing.`;
+  return `Institutional (checklist) read: the questionnaire is designed to surface proportional controls before go-live. The strongest residual-risk themes by domain are: ${top}. These scores weight each section by why the university asks it—not character count alone—but they still reflect self-reported answers only, not verified testing.`;
 }

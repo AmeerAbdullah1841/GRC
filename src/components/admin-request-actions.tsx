@@ -24,11 +24,25 @@ export function AdminRequestActions({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, adminNotes: notes }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as {
+        error?: string;
+        emailSent?: boolean;
+        emailError?: string | null;
+      };
       if (!res.ok) {
         setErr(data.error ?? "Update failed");
         return;
       }
+
+      const params = new URLSearchParams();
+      params.set("decided", status.toLowerCase());
+      if (data.emailSent) {
+        params.set("email", "sent");
+      } else {
+        params.set("email", "failed");
+        if (data.emailError) params.set("emailMsg", data.emailError);
+      }
+      router.push(`/admin/request/${submissionId}?${params.toString()}`);
       router.refresh();
     } catch {
       setErr("Network error");
@@ -39,7 +53,7 @@ export function AdminRequestActions({
 
   if (currentStatus !== "PENDING") {
     return (
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-zinc-600 dark:text-zinc-300">
         This request was already marked <strong>{currentStatus}</strong>.
       </p>
     );
@@ -56,7 +70,10 @@ export function AdminRequestActions({
           placeholder="Internal notes for the record…"
         />
       </label>
-      {err ? <p className="text-sm text-red-600">{err}</p> : null}
+      {err ? <p className="text-sm text-red-600 dark:text-red-400">{err}</p> : null}
+      <p className="text-xs text-zinc-600 dark:text-zinc-400">
+        Approving or rejecting will email the vendor contact from the questionnaire.
+      </p>
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
@@ -64,7 +81,7 @@ export function AdminRequestActions({
           onClick={() => void patch("APPROVED")}
           className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
         >
-          Approve
+          {busy ? "Saving…" : "Approve"}
         </button>
         <button
           type="button"
@@ -72,7 +89,7 @@ export function AdminRequestActions({
           onClick={() => void patch("REJECTED")}
           className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:bg-zinc-950 dark:text-red-200 dark:hover:bg-red-950/40"
         >
-          Reject
+          {busy ? "Saving…" : "Reject"}
         </button>
       </div>
     </div>

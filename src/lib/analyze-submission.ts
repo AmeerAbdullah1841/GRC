@@ -1,4 +1,5 @@
 import { buildChecklistInterpretation, computeHeuristicDomainScores } from "@/lib/domain-risk-scores";
+import { buildChecklistRecommendationRationale } from "@/lib/recommendation-rationale";
 import { optionalLlmSecurityReview } from "@/lib/llm-security-review";
 import type { DataSubcategory, QuestionnaireAnswers } from "@/lib/questionnaire-types";
 import { SECURITY_DOMAIN_IDS, type SecurityDomainId } from "@/lib/security-domains";
@@ -36,6 +37,8 @@ export type AnalysisResult = {
   domainScores: Record<SecurityDomainId, number>;
   /** Why the answers matter from the university security perspective (checklist and/or LLM). */
   institutionalInterpretation: string;
+  /** Plain-language link between score and APPROVE / REVIEW / NOT RECOMMENDED. */
+  recommendationRationale: string;
   analysisMeta: AnalysisMeta;
 };
 
@@ -43,6 +46,7 @@ export type ParsedStoredAnalysis = {
   factors: AnalysisFactor[];
   domainScores: Record<string, number> | null;
   institutionalInterpretation: string | null;
+  recommendationRationale: string | null;
   meta: AnalysisMeta | null;
 };
 
@@ -52,6 +56,7 @@ export function serializeAnalysisForStorage(result: AnalysisResult): string {
     factors: result.factors,
     domainScores: result.domainScores,
     institutionalInterpretation: result.institutionalInterpretation,
+    recommendationRationale: result.recommendationRationale,
     meta: result.analysisMeta,
   });
 }
@@ -65,6 +70,7 @@ export function parseStoredAnalysis(raw: string): ParsedStoredAnalysis {
         factors: j as AnalysisFactor[],
         domainScores: null,
         institutionalInterpretation: null,
+        recommendationRationale: null,
         meta: null,
       };
     }
@@ -73,6 +79,7 @@ export function parseStoredAnalysis(raw: string): ParsedStoredAnalysis {
         factors?: AnalysisFactor[];
         domainScores?: Record<string, number>;
         institutionalInterpretation?: string;
+        recommendationRationale?: string;
         meta?: AnalysisMeta;
       };
       return {
@@ -80,13 +87,21 @@ export function parseStoredAnalysis(raw: string): ParsedStoredAnalysis {
         domainScores: o.domainScores && typeof o.domainScores === "object" ? o.domainScores : null,
         institutionalInterpretation:
           typeof o.institutionalInterpretation === "string" ? o.institutionalInterpretation : null,
+        recommendationRationale:
+          typeof o.recommendationRationale === "string" ? o.recommendationRationale : null,
         meta: o.meta && typeof o.meta === "object" ? o.meta : null,
       };
     }
   } catch {
     /* fall through */
   }
-  return { factors: [], domainScores: null, institutionalInterpretation: null, meta: null };
+  return {
+    factors: [],
+    domainScores: null,
+    institutionalInterpretation: null,
+    recommendationRationale: null,
+    meta: null,
+  };
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -170,6 +185,14 @@ export async function analyzeSubmissionComplete(
     domainScores,
     institutionalInterpretation:
       llm.institutionalInterpretation?.trim() || base.institutionalInterpretation,
+    recommendationRationale:
+      llm.recommendationRationale?.trim() ||
+      buildChecklistRecommendationRationale(
+        finalized.recommendation,
+        finalized.riskScore,
+        finalized.securityLevel,
+        mergedFactors,
+      ),
     analysisMeta: {
       hasLlmLayer: true,
       model: process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini",
@@ -445,10 +468,17 @@ export function analyzeQuestionnaire(
   const core = finalizeFromRisk(risk, factors, s1.subcategories);
   const domainScores = computeHeuristicDomainScores(answers);
   const institutionalInterpretation = buildChecklistInterpretation(domainScores);
+  const recommendationRationale = buildChecklistRecommendationRationale(
+    core.recommendation,
+    core.riskScore,
+    core.securityLevel,
+    core.factors,
+  );
   return {
     ...core,
     domainScores,
     institutionalInterpretation,
+    recommendationRationale,
     analysisMeta: { hasLlmLayer: false },
   };
 }

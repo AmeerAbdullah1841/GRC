@@ -31,6 +31,16 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The Next.js app lives at the **repository root** (not in a `web/` subfolder). In Vercel project settings:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Root Directory** — leave empty (`.`). If it was set to `web`, clear it and save.
+2. **Framework Preset** — **Next.js** (not “Other”).
+3. **Build Command** — leave default (`npm run build`). Run `npx prisma migrate deploy` once against production `DATABASE_URL` before or after the first deploy.
+4. **Environment variables** (Production) — copy from `.env.example`:
+   - `DATABASE_URL` (PostgreSQL, e.g. Vercel Postgres or Neon)
+   - `ADMIN_PASSWORD`
+   - `ADMIN_SESSION_SECRET`
+   - Optional: `SENDGRID_*`, `OPENAI_*`
+5. **Redeploy** after changing settings (Deployments → ⋯ → Redeploy).
+
+A blank Vercel **404 NOT_FOUND** page usually means the root directory pointed at the wrong folder or the framework was not detected as Next.js.

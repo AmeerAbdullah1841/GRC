@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sendVendorDecisionEmail } from "@/lib/send-vendor-decision-email";
 import { getAdminSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 
@@ -18,6 +19,17 @@ export async function PATCH(req: Request, ctx: Params) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
+  const existing = await prisma.submission.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: "Submission not found." }, { status: 404 });
+  }
+  if (existing.status !== "PENDING") {
+    return NextResponse.json(
+      { error: `This submission was already ${existing.status.toLowerCase()}.` },
+      { status: 409 },
+    );
+  }
+
   const updated = await prisma.submission.update({
     where: { id },
     data: {
@@ -27,5 +39,18 @@ export async function PATCH(req: Request, ctx: Params) {
     },
   });
 
-  return NextResponse.json({ id: updated.id, status: updated.status });
+  const emailResult = await sendVendorDecisionEmail({
+    to: updated.contactEmail,
+    contactName: updated.contactName,
+    companyName: updated.companyName,
+    status: body.status,
+    adminNotes: updated.adminNotes,
+  });
+
+  return NextResponse.json({
+    id: updated.id,
+    status: updated.status,
+    emailSent: emailResult.sent,
+    emailError: emailResult.error ?? null,
+  });
 }

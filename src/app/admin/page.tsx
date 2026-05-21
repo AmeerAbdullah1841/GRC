@@ -35,7 +35,7 @@ export default async function AdminDashboardPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Submissions</h1>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="text-sm text-zinc-600 dark:text-zinc-300">
               New requests stay pending until you approve or reject them.
             </p>
           </div>
@@ -51,7 +51,7 @@ export default async function AdminDashboardPage() {
 
         <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-xs font-medium uppercase text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
+            <thead className="bg-zinc-50 text-xs font-medium uppercase text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
               <tr>
                 <th className="px-4 py-3">Company</th>
                 <th className="px-4 py-3">Risk</th>
@@ -63,7 +63,7 @@ export default async function AdminDashboardPage() {
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-zinc-600 dark:text-zinc-400">
                     No submissions yet.
                   </td>
                 </tr>
@@ -77,12 +77,12 @@ export default async function AdminDashboardPage() {
                       >
                         {r.companyName}
                       </Link>
-                      <div className="text-xs text-zinc-500">{r.contactEmail}</div>
+                      <div className="text-xs text-zinc-600 dark:text-zinc-400">{r.contactEmail}</div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-mono">{r.riskScore}</span>
                       <span className="text-zinc-400"> / </span>
-                      <span className="text-xs text-zinc-600">{r.securityLevel}</span>
+                      <span className="text-xs text-zinc-600 dark:text-zinc-400">{r.securityLevel}</span>
                     </td>
                     <td className="px-4 py-3 text-xs">{r.recommendation.replaceAll("_", " ")}</td>
                     <td className="px-4 py-3">
@@ -92,7 +92,7 @@ export default async function AdminDashboardPage() {
                         {r.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-zinc-500">
+                    <td className="px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400">
                       {r.createdAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
                     </td>
                   </tr>
