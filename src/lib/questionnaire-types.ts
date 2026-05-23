@@ -39,7 +39,16 @@ export type NetworkScope =
 
 export type YesNoUnsure = "yes" | "no" | "unsure";
 
+/** Present when the vendor submitted an uploaded PDF/DOCX/TXT instead of the web form. */
+export type DocumentUploadMeta = {
+  source: "document_upload";
+  fileName: string;
+  mimeType: string;
+  extractedText: string;
+};
+
 export type QuestionnaireAnswers = {
+  uploadMeta?: DocumentUploadMeta;
   section1: {
     involvesNonPublic: boolean;
     subcategories: DataSubcategory[];

@@ -10,6 +10,7 @@ import {
   formatYesNoUnsure,
 } from "@/lib/questionnaire-labels";
 import type { QuestionnaireAnswers } from "@/lib/questionnaire-types";
+import { isDocumentUpload } from "@/lib/upload-questionnaire";
 import type { ReactNode } from "react";
 
 function QaRow({ question, answer }: { question: string; answer: string }) {
@@ -47,7 +48,47 @@ function SectionBlock({
   );
 }
 
+function UploadedDocumentReview({ answers }: { answers: QuestionnaireAnswers }) {
+  const meta = answers.uploadMeta!;
+  return (
+    <div className="flex flex-col gap-6">
+      <section className="rounded-xl border border-violet-200 bg-violet-50/80 px-5 py-4 dark:border-violet-900 dark:bg-violet-950/40">
+        <h3 className="text-base font-semibold text-violet-950 dark:text-violet-100">Uploaded questionnaire</h3>
+        <p className="mt-2 text-sm text-violet-900 dark:text-violet-200">
+          This submission was provided as a file, not the online form. AI analysis used the extracted text below.
+        </p>
+        <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="font-medium text-violet-950 dark:text-violet-100">File name</dt>
+            <dd className="text-violet-900 dark:text-violet-200">{meta.fileName}</dd>
+          </div>
+          <div>
+            <dt className="font-medium text-violet-950 dark:text-violet-100">File type</dt>
+            <dd className="text-violet-900 dark:text-violet-200">{meta.mimeType}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/40">
+        <div className="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
+          <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Extracted document text</h3>
+          <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+            Full text sent to AI for review ({meta.extractedText.length.toLocaleString()} characters)
+          </p>
+        </div>
+        <pre className="max-h-[min(70vh,720px)] overflow-auto whitespace-pre-wrap px-5 py-4 text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">
+          {meta.extractedText}
+        </pre>
+      </section>
+    </div>
+  );
+}
+
 export function AdminQuestionnaireReview({ answers }: { answers: QuestionnaireAnswers }) {
+  if (isDocumentUpload(answers)) {
+    return <UploadedDocumentReview answers={answers} />;
+  }
+
   const s1 = answers.section1;
   const s2 = answers.section2;
   const s3 = answers.section3;

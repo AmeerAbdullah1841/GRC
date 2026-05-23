@@ -10,6 +10,7 @@ import { mergeQuestionnaireAnswers } from "@/lib/merge-questionnaire";
 import type { QuestionnaireAnswers } from "@/lib/questionnaire-types";
 import { SECURITY_DOMAIN_IDS, type SecurityDomainId } from "@/lib/security-domains";
 import { getAdminSession } from "@/lib/session";
+import { isDocumentUpload } from "@/lib/upload-questionnaire";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -57,13 +58,15 @@ export default async function AdminRequestDetailPage({ params, searchParams }: P
   const recommendationRationale = parsed.recommendationRationale?.trim() || null;
   const analysisMeta = parsed.meta;
   const hasOpenAiReview = Boolean(analysisMeta?.hasLlmLayer);
+  const uploadedDocument = answers ? isDocumentUpload(answers) : false;
 
   const aiReviewPanel = (
     <>
       {hasOpenAiReview ? (
         <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-200">
           This review was generated entirely by <strong>AI</strong>. All scores, summaries, and bullet points below
-          come from the AI analysis of the vendor questionnaire.
+          come from the AI analysis of the{" "}
+          {uploadedDocument ? "uploaded questionnaire document" : "vendor questionnaire"}.
         </p>
       ) : (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
@@ -132,6 +135,9 @@ export default async function AdminRequestDetailPage({ params, searchParams }: P
           </p>
           <p className="text-xs text-zinc-600 dark:text-zinc-400">
             Submitted {row.createdAt.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" })}
+            {uploadedDocument && answers?.uploadMeta ? (
+              <> · Document upload: {answers.uploadMeta.fileName}</>
+            ) : null}
           </p>
         </header>
 

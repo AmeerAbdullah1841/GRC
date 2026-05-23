@@ -1,5 +1,16 @@
-import type { QuestionnaireAnswers } from "@/lib/questionnaire-types";
+import type { DocumentUploadMeta, QuestionnaireAnswers } from "@/lib/questionnaire-types";
 import { emptyQuestionnaire } from "@/lib/questionnaire-types";
+
+function isUploadMeta(v: unknown): v is DocumentUploadMeta {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return (
+    o.source === "document_upload" &&
+    typeof o.fileName === "string" &&
+    typeof o.mimeType === "string" &&
+    typeof o.extractedText === "string"
+  );
+}
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -31,5 +42,9 @@ export function mergeQuestionnaireAnswers(patch: unknown): QuestionnaireAnswers 
     return out as T;
   };
 
-  return merge(base, patch) as QuestionnaireAnswers;
+  const merged = merge(base, patch) as QuestionnaireAnswers;
+  if (isPlainObject(patch) && isUploadMeta((patch as { uploadMeta?: unknown }).uploadMeta)) {
+    merged.uploadMeta = (patch as { uploadMeta: DocumentUploadMeta }).uploadMeta;
+  }
+  return merged;
 }

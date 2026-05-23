@@ -1,6 +1,8 @@
 import { buildChecklistInterpretation, computeHeuristicDomainScores } from "@/lib/domain-risk-scores";
 import { buildChecklistRecommendationRationale } from "@/lib/recommendation-rationale";
+import { optionalLlmDocumentReview } from "@/lib/llm-document-review";
 import { optionalLlmSecurityReview } from "@/lib/llm-security-review";
+import type { LlmReviewOutcome } from "@/lib/llm-review-core";
 import type { DataSubcategory, QuestionnaireAnswers } from "@/lib/questionnaire-types";
 import { SECURITY_DOMAIN_IDS, type SecurityDomainId } from "@/lib/security-domains";
 import { scanSemanticSecuritySignals } from "@/lib/semantic-security-scan";
@@ -156,19 +158,7 @@ function finalizeFromRisk(
   return { riskScore: risk, securityLevel, recommendation, factors: outFactors };
 }
 
-/**
- * Full pipeline: OpenAI-only security review (no checklist or pattern merge).
- */
-export async function analyzeSubmissionComplete(
-  answers: QuestionnaireAnswers,
-): Promise<AnalysisResult> {
-  const llm = await optionalLlmSecurityReview(answers);
-  if (!llm) {
-    throw new Error(
-      "OpenAI security review failed or OPENAI_API_KEY is not configured.",
-    );
-  }
-
+function analysisFromLlm(llm: LlmReviewOutcome): AnalysisResult {
   return {
     riskScore: llm.riskScore,
     securityLevel: llm.securityLevel,
@@ -182,6 +172,37 @@ export async function analyzeSubmissionComplete(
       model: llm.model,
     },
   };
+}
+
+/**
+ * Full pipeline: OpenAI-only security review (no checklist or pattern merge).
+ */
+export async function analyzeSubmissionComplete(
+  answers: QuestionnaireAnswers,
+): Promise<AnalysisResult> {
+  const llm = await optionalLlmSecurityReview(answers);
+  if (!llm) {
+    throw new Error(
+      "OpenAI security review failed or OPENAI_API_KEY is not configured.",
+    );
+  }
+  return analysisFromLlm(llm);
+}
+
+/**
+ * OpenAI review for an uploaded questionnaire document (extracted text).
+ */
+export async function analyzeDocumentSubmissionComplete(
+  extractedText: string,
+  fileName: string,
+): Promise<AnalysisResult> {
+  const llm = await optionalLlmDocumentReview(extractedText, fileName);
+  if (!llm) {
+    throw new Error(
+      "OpenAI document review failed or OPENAI_API_KEY is not configured.",
+    );
+  }
+  return analysisFromLlm(llm);
 }
 
 /**
