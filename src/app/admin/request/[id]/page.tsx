@@ -4,13 +4,10 @@ import { AdminRequestActions } from "@/components/admin-request-actions";
 import { AdminRequestTabs } from "@/components/admin-request-tabs";
 import { AdminReviewBreakdown } from "@/components/admin-review-breakdown";
 import { SiteHeader } from "@/components/site-header";
-import type { AnalysisFactor } from "@/lib/analyze-submission";
 import { parseStoredAnalysis } from "@/lib/analyze-submission";
-import { buildChecklistInterpretation, computeHeuristicDomainScores } from "@/lib/domain-risk-scores";
 import { prisma } from "@/lib/db";
 import { mergeQuestionnaireAnswers } from "@/lib/merge-questionnaire";
 import type { QuestionnaireAnswers } from "@/lib/questionnaire-types";
-import { buildChecklistRecommendationRationale } from "@/lib/recommendation-rationale";
 import { SECURITY_DOMAIN_IDS, type SecurityDomainId } from "@/lib/security-domains";
 import { getAdminSession } from "@/lib/session";
 import Link from "next/link";
@@ -27,56 +24,15 @@ function recBadge(rec: string) {
   return "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200";
 }
 
-function mergeDomainScores(
-  answers: QuestionnaireAnswers | null,
-  stored: Record<string, number> | null,
-): Record<SecurityDomainId, number> | null {
-  if (!answers && !stored) return null;
-  const baseline = answers ? computeHeuristicDomainScores(answers) : null;
-  if (!stored && baseline) return baseline;
+function storedDomainScores(stored: Record<string, number> | null): Record<SecurityDomainId, number> | null {
   if (!stored) return null;
-  const out = baseline ? { ...baseline } : ({} as Record<SecurityDomainId, number>);
+  const out = {} as Record<SecurityDomainId, number>;
   for (const id of SECURITY_DOMAIN_IDS) {
     const v = stored[id];
-    if (typeof v === "number" && !Number.isNaN(v)) {
-      out[id] = Math.min(100, Math.max(0, Math.round(v)));
-    } else if (!(id in out) && baseline) {
-      out[id] = baseline[id];
-    } else if (!(id in out)) {
-      out[id] = 0;
-    }
+    if (typeof v !== "number" || Number.isNaN(v)) return null;
+    out[id] = Math.min(100, Math.max(0, Math.round(v)));
   }
   return out;
-}
-
-function FactorList({ factors }: { factors: AnalysisFactor[] }) {
-  if (factors.length === 0) {
-    return <p className="text-sm text-zinc-600 dark:text-zinc-400">No factor list stored for this submission.</p>;
-  }
-  return (
-    <ul className="flex flex-col gap-2">
-      {factors.map((f, i) => (
-        <li
-          key={`${f.title}-${i}`}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/60"
-        >
-          <span className="font-medium text-zinc-900 dark:text-zinc-100">{f.title}</span>
-          <span
-            className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
-              f.kind === "strength"
-                ? "bg-emerald-200/80 text-emerald-900"
-                : f.kind === "concern"
-                  ? "bg-amber-200/80 text-amber-900"
-                  : "bg-zinc-200 text-zinc-800"
-            }`}
-          >
-            {f.kind}
-          </span>
-          <p className="mt-1 text-zinc-600 dark:text-zinc-300">{f.detail}</p>
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 export default async function AdminRequestDetailPage({ params, searchParams }: Params) {
@@ -96,54 +52,45 @@ export default async function AdminRequestDetailPage({ params, searchParams }: P
 
   const parsed = parseStoredAnalysis(row.analysisFactorsJson);
   const factors = parsed.factors;
-  const domainScores = mergeDomainScores(answers, parsed.domainScores);
-  const interpretation =
-    parsed.institutionalInterpretation?.trim() ||
-    (domainScores ? buildChecklistInterpretation(domainScores) : null);
-  const recommendationRationale =
-    parsed.recommendationRationale?.trim() ||
-    buildChecklistRecommendationRationale(
-      row.recommendation,
-      row.riskScore,
-      row.securityLevel as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
-      factors,
-    );
+  const domainScores = storedDomainScores(parsed.domainScores);
+  const interpretation = parsed.institutionalInterpretation?.trim() || null;
+  const recommendationRationale = parsed.recommendationRationale?.trim() || null;
   const analysisMeta = parsed.meta;
+  const hasOpenAiReview = Boolean(analysisMeta?.hasLlmLayer);
 
   const aiReviewPanel = (
     <>
-      {analysisMeta?.hasLlmLayer ? (
+      {hasOpenAiReview ? (
         <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-200">
-          This submission includes an <strong>OpenAI</strong> security pass
-          {analysisMeta.model ? ` (${analysisMeta.model})` : ""} on top of checklist and pattern analysis.
+          This review was generated entirely by <strong>AI</strong>. All scores, summaries, and bullet points below
+          come from the AI analysis of the vendor questionnaire.
         </p>
       ) : (
-        <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300">
-          Checklist + semantic pattern analysis only. Set <code className="font-mono">OPENAI_API_KEY</code> with
-          billing credits for full AI narrative review.
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
+          This submission was analyzed before OpenAI-only mode or without a successful AI pass. Submit a new
+          questionnaire to generate a full OpenAI review.
         </p>
       )}
 
-      <AdminReviewBreakdown
-        recommendation={row.recommendation}
-        recommendationRationale={recommendationRationale}
-        factors={factors}
-        hasAi={Boolean(analysisMeta?.hasLlmLayer)}
-      />
+      {hasOpenAiReview ? (
+        <>
+          <AdminReviewBreakdown
+            recommendation={row.recommendation}
+            recommendationRationale={recommendationRationale}
+            factors={factors}
+            model={analysisMeta?.model}
+          />
 
-      {interpretation ? (
-        <section className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900/40">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Institutional security read</h2>
-          <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">{interpretation}</p>
-        </section>
+          {interpretation ? (
+            <section className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Institutional security read</h2>
+              <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">{interpretation}</p>
+            </section>
+          ) : null}
+
+          {domainScores ? <AdminDomainRatings domainScores={domainScores} /> : null}
+        </>
       ) : null}
-
-      {domainScores ? <AdminDomainRatings domainScores={domainScores} /> : null}
-
-      <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900/40">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">All review notes (technical)</h2>
-        <FactorList factors={factors} />
-      </section>
 
       <details className="rounded-xl border border-zinc-200 dark:border-zinc-800">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -192,14 +139,13 @@ export default async function AdminRequestDetailPage({ params, searchParams }: P
           <div>
             <p className="text-xs font-medium uppercase text-zinc-600 dark:text-zinc-400">Risk score</p>
             <p className="text-2xl font-mono font-semibold text-zinc-900 dark:text-zinc-50">{row.riskScore}</p>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400">0 = lowest concern, 100 = highest.</p>
           </div>
           <div>
             <p className="text-xs font-medium uppercase text-zinc-600 dark:text-zinc-400">Sensitivity band</p>
             <p className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">{row.securityLevel}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase text-zinc-600 dark:text-zinc-400">System recommendation</p>
+            <p className="text-xs font-medium uppercase text-zinc-600 dark:text-zinc-400">AI recommendation</p>
             <p className={`mt-1 inline-flex rounded-full px-3 py-1 text-sm font-medium ${recBadge(row.recommendation)}`}>
               {row.recommendation.replaceAll("_", " ")}
             </p>

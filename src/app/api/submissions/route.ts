@@ -1,5 +1,4 @@
 import {
-  analyzeQuestionnaire,
   analyzeSubmissionComplete,
   serializeAnalysisForStorage,
 } from "@/lib/analyze-submission";
@@ -28,8 +27,14 @@ export async function POST(req: NextRequest) {
     try {
       analysis = await analyzeSubmissionComplete(answers);
     } catch (analysisErr) {
-      console.error("[submissions] analysis failed, using checklist-only fallback:", analysisErr);
-      analysis = analyzeQuestionnaire(answers);
+      console.error("[submissions] OpenAI analysis failed:", analysisErr);
+      return NextResponse.json(
+        {
+          error:
+            "AI security review is unavailable. Check OPENAI_API_KEY and billing, then try again.",
+        },
+        { status: 503 },
+      );
     }
 
     const row = await prisma.submission.create({

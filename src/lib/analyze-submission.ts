@@ -157,45 +157,29 @@ function finalizeFromRisk(
 }
 
 /**
- * Full pipeline: structured rules + semantic text patterns + optional OpenAI review.
+ * Full pipeline: OpenAI-only security review (no checklist or pattern merge).
  */
 export async function analyzeSubmissionComplete(
   answers: QuestionnaireAnswers,
 ): Promise<AnalysisResult> {
-  const base = analyzeQuestionnaire(answers);
   const llm = await optionalLlmSecurityReview(answers);
-  if (!llm) return base;
-
-  const mergedRisk = clamp(Math.round(base.riskScore + llm.riskDelta), 0, 100);
-  const mergedFactors = [...base.factors, ...llm.factors];
-  const finalized = finalizeFromRisk(mergedRisk, mergedFactors, answers.section1.subcategories);
-
-  const domainScores = { ...base.domainScores } as Record<SecurityDomainId, number>;
-  if (llm.domainScores) {
-    for (const id of SECURITY_DOMAIN_IDS) {
-      const v = llm.domainScores[id];
-      if (typeof v === "number" && !Number.isNaN(v)) {
-        domainScores[id] = clamp(Math.round(v), 0, 100);
-      }
-    }
+  if (!llm) {
+    throw new Error(
+      "OpenAI security review failed or OPENAI_API_KEY is not configured.",
+    );
   }
 
   return {
-    ...finalized,
-    domainScores,
-    institutionalInterpretation:
-      llm.institutionalInterpretation?.trim() || base.institutionalInterpretation,
-    recommendationRationale:
-      llm.recommendationRationale?.trim() ||
-      buildChecklistRecommendationRationale(
-        finalized.recommendation,
-        finalized.riskScore,
-        finalized.securityLevel,
-        mergedFactors,
-      ),
+    riskScore: llm.riskScore,
+    securityLevel: llm.securityLevel,
+    recommendation: llm.recommendation,
+    factors: llm.factors,
+    domainScores: llm.domainScores,
+    institutionalInterpretation: llm.institutionalInterpretation,
+    recommendationRationale: llm.recommendationRationale,
     analysisMeta: {
       hasLlmLayer: true,
-      model: process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini",
+      model: llm.model,
     },
   };
 }

@@ -13,18 +13,24 @@ function sendGridConfigured() {
   return Boolean(process.env.SENDGRID_API_KEY?.trim() && process.env.SENDGRID_FROM_EMAIL?.trim());
 }
 
-function buildMessage(status: VendorDecisionEmailInput["status"]) {
+function buildMessage(
+  status: VendorDecisionEmailInput["status"],
+  companyName: string,
+) {
+  const org = companyName.trim() || "your organization";
   if (status === "APPROVED") {
     return {
-      subject: "Your security questionnaire proposal has been approved",
-      headline: "Congratulations! Your proposal has been approved.",
-      body: "The university security office has reviewed your submission and approved your proposal.",
+      subject: `Vendor security intake — approved (${org})`,
+      preheader: "Your questionnaire was reviewed and approved by the security office.",
+      headline: "Your security questionnaire has been approved",
+      body: "The university security office has completed its review and approved your vendor security questionnaire submission.",
     };
   }
   return {
-    subject: "Update on your security questionnaire proposal",
-    headline: "We regret to inform you that your proposal has been rejected.",
-    body: "The university security office has reviewed your submission and did not approve your proposal at this time.",
+    subject: `Vendor security intake — decision (${org})`,
+    preheader: "Your questionnaire was reviewed. See the decision details below.",
+    headline: "Your security questionnaire was not approved",
+    body: "The university security office has completed its review. Your vendor security questionnaire was not approved at this time.",
   };
 }
 
@@ -40,8 +46,12 @@ export async function sendVendorDecisionEmail(
   const fromEmail = process.env.SENDGRID_FROM_EMAIL!.trim();
   const fromName = process.env.SENDGRID_FROM_NAME?.trim() || "University Vendor Security Intake";
 
-  const { subject, headline, body } = buildMessage(input.status);
+  const { subject, preheader, headline, body } = buildMessage(
+    input.status,
+    input.companyName,
+  );
   const greeting = input.contactName.trim() ? `Hello ${input.contactName},` : "Hello,";
+  const replyTo = process.env.SENDGRID_REPLY_TO?.trim() || fromEmail;
 
   const notesBlock =
     input.adminNotes?.trim() ?
@@ -49,15 +59,32 @@ export async function sendVendorDecisionEmail(
     : "";
 
   const html = `
-    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#18181b;">
-      <p style="font-size:15px;">${escapeHtml(greeting)}</p>
-      <p style="font-size:18px;font-weight:600;margin:20px 0 8px;">${escapeHtml(headline)}</p>
-      <p style="font-size:14px;line-height:1.6;color:#3f3f46;">${escapeHtml(body)}</p>
-      <p style="font-size:14px;color:#52525b;margin-top:16px;"><strong>Organization:</strong> ${escapeHtml(input.companyName)}</p>
-      ${notesBlock}
-      <p style="margin-top:24px;font-size:12px;color:#71717a;">This is an automated message from the university vendor security intake system.</p>
-    </div>
-  `.trim();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:24px;background:#f4f4f5;font-family:system-ui,-apple-system,sans-serif;color:#18181b;">
+  <span style="display:none;max-height:0;overflow:hidden;">${escapeHtml(preheader)}</span>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
+    <tr>
+      <td style="background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;padding:28px;">
+        <p style="margin:0 0 16px;font-size:15px;line-height:1.5;">${escapeHtml(greeting)}</p>
+        <p style="margin:0 0 12px;font-size:17px;font-weight:600;line-height:1.4;">${escapeHtml(headline)}</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#3f3f46;">${escapeHtml(body)}</p>
+        <p style="margin:0;font-size:14px;color:#52525b;"><strong>Organization:</strong> ${escapeHtml(input.companyName)}</p>
+        ${notesBlock}
+        <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#71717a;">
+          Automated notification from the university vendor security intake system.
+          Reply to this message if you have questions about your submission.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
 
   const text = [
     greeting,
@@ -67,6 +94,8 @@ export async function sendVendorDecisionEmail(
     "",
     `Organization: ${input.companyName}`,
     input.adminNotes?.trim() ? `Reviewer note: ${input.adminNotes.trim()}` : "",
+    "",
+    "— University vendor security intake (automated notification)",
   ]
     .filter(Boolean)
     .join("\n");
@@ -76,9 +105,15 @@ export async function sendVendorDecisionEmail(
     await sgMail.send({
       to: input.to.trim(),
       from: { email: fromEmail, name: fromName },
+      replyTo,
       subject,
       text,
       html,
+      categories: ["vendor-decision"],
+      trackingSettings: {
+        clickTracking: { enable: false },
+        openTracking: { enable: false },
+      },
     });
     return { sent: true };
   } catch (e) {
