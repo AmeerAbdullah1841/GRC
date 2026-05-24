@@ -28,6 +28,19 @@ const STEP_LABELS = [
   "Review & submit",
 ];
 
+function isContactEmailValid(email: string) {
+  const trimmed = email.trim();
+  return trimmed.includes("@") && trimmed.includes(".com");
+}
+
+function isIntroStepValid(companyName: string, contactName: string, contactEmail: string) {
+  return (
+    companyName.trim().length > 0 &&
+    contactName.trim().length > 0 &&
+    isContactEmailValid(contactEmail)
+  );
+}
+
 export function SubmitWizard() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -39,10 +52,11 @@ export function SubmitWizard() {
   const [err, setErr] = useState<string | null>(null);
 
   const last = STEP_LABELS.length - 1;
+  const introStepValid = isIntroStepValid(companyName, contactName, contactEmail);
 
   async function submit() {
     setErr(null);
-    if (!companyName.trim() || !contactName.trim() || !contactEmail.trim()) {
+    if (!introStepValid) {
       setErr("Please complete company and contact information on the first step.");
       setStep(0);
       return;
@@ -104,6 +118,11 @@ export function SubmitWizard() {
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
                 />
+                {contactEmail.trim() && !isContactEmailValid(contactEmail) ? (
+                  <span className=" ml-3 text-xs font-normal text-amber-700 dark:text-red-500">
+                    Enter a valid email
+                  </span>
+                ) : null}
               </label>
             </div>
           </div>
@@ -174,8 +193,8 @@ export function SubmitWizard() {
         {step < last ? (
           <button
             type="button"
-            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
-            disabled={busy}
+            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+            disabled={busy || (step === 0 && !introStepValid)}
             onClick={() => setStep((s) => Math.min(last, s + 1))}
           >
             Continue
