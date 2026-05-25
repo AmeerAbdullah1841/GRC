@@ -2,6 +2,7 @@ import {
   analyzeSubmissionComplete,
   serializeAnalysisForStorage,
 } from "@/lib/analyze-submission";
+import { answersJsonForStorage, resolveStoredAuditReportReview } from "@/lib/audit-report-storage";
 import { prisma } from "@/lib/db";
 import { mergeQuestionnaireAnswers } from "@/lib/merge-questionnaire";
 import type { NextRequest } from "next/server";
@@ -37,16 +38,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const auditReportReview = await resolveStoredAuditReportReview(answers);
+    const answersToStore = answersJsonForStorage(answers);
+
     const row = await prisma.submission.create({
       data: {
         companyName,
         contactName,
         contactEmail,
-        answersJson: JSON.stringify(answers),
+        answersJson: JSON.stringify(answersToStore),
         riskScore: analysis.riskScore,
         securityLevel: analysis.securityLevel,
         recommendation: analysis.recommendation,
-        analysisFactorsJson: serializeAnalysisForStorage(analysis),
+        analysisFactorsJson: serializeAnalysisForStorage(analysis, auditReportReview),
       },
     });
 

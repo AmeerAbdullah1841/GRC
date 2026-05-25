@@ -1,5 +1,6 @@
 "use client";
 
+import { isContactEmailValid, isContactInfoValid } from "@/lib/contact-validation";
 import { emptyQuestionnaire, type QuestionnaireAnswers } from "@/lib/questionnaire-types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -28,19 +29,6 @@ const STEP_LABELS = [
   "Review & submit",
 ];
 
-function isContactEmailValid(email: string) {
-  const trimmed = email.trim();
-  return trimmed.includes("@") && trimmed.includes(".com");
-}
-
-function isIntroStepValid(companyName: string, contactName: string, contactEmail: string) {
-  return (
-    companyName.trim().length > 0 &&
-    contactName.trim().length > 0 &&
-    isContactEmailValid(contactEmail)
-  );
-}
-
 export function SubmitWizard() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -52,7 +40,7 @@ export function SubmitWizard() {
   const [err, setErr] = useState<string | null>(null);
 
   const last = STEP_LABELS.length - 1;
-  const introStepValid = isIntroStepValid(companyName, contactName, contactEmail);
+  const introStepValid = isContactInfoValid(companyName, contactName, contactEmail);
 
   async function submit() {
     setErr(null);

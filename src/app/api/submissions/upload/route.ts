@@ -2,6 +2,8 @@ import {
   analyzeDocumentSubmissionComplete,
   serializeAnalysisForStorage,
 } from "@/lib/analyze-submission";
+import { answersJsonForStorage, resolveStoredAuditReportReview } from "@/lib/audit-report-storage";
+import type { AuditReportMeta, AuditReportReview } from "@/lib/audit-report-types";
 import { prisma } from "@/lib/db";
 import {
   extractDocumentText,
@@ -16,6 +18,15 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const MIN_TEXT_LENGTH = 80;
+
+function parseJsonField<T>(raw: FormDataEntryValue | null): T | undefined {
+  if (typeof raw !== "string" || !raw.trim()) return undefined;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return undefined;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -77,16 +88,24 @@ export async function POST(req: NextRequest) {
 
     const answers = buildUploadQuestionnaireAnswers(extractedText, file.name, file.type || "application/octet-stream");
 
+    const auditMeta = parseJsonField<AuditReportMeta>(form.get("auditReportMeta"));
+    const auditReview = parseJsonField<AuditReportReview>(form.get("auditReportReview"));
+    if (auditMeta) answers.auditReportMeta = auditMeta;
+    if (auditReview) answers.auditReportReview = auditReview;
+
+    const auditReportReview = await resolveStoredAuditReportReview(answers);
+    const answersToStore = answersJsonForStorage(answers);
+
     const row = await prisma.submission.create({
       data: {
         companyName,
         contactName,
         contactEmail,
-        answersJson: JSON.stringify(answers),
+        answersJson: JSON.stringify(answersToStore),
         riskScore: analysis.riskScore,
         securityLevel: analysis.securityLevel,
         recommendation: analysis.recommendation,
-        analysisFactorsJson: serializeAnalysisForStorage(analysis),
+        analysisFactorsJson: serializeAnalysisForStorage(analysis, auditReportReview),
       },
     });
 

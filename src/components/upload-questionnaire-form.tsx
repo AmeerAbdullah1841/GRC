@@ -1,5 +1,8 @@
 "use client";
 
+import { AuditReportUpload } from "@/components/audit-report-upload";
+import { isContactEmailValid, isContactInfoValid } from "@/lib/contact-validation";
+import type { AuditReportMeta, AuditReportReview } from "@/lib/audit-report-types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -15,13 +18,16 @@ export function UploadQuestionnaireForm() {
   const [contactEmail, setContactEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [auditMeta, setAuditMeta] = useState<AuditReportMeta | undefined>();
+  const [auditReview, setAuditReview] = useState<AuditReportReview | undefined>();
+  const contactInfoValid = isContactInfoValid(companyName, contactName, contactEmail);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
 
-    if (!companyName.trim() || !contactName.trim() || !contactEmail.trim()) {
-      setErr("Company name, contact name, and email are required.");
+    if (!contactInfoValid) {
+      setErr("Company name, contact name, and a valid email are required.");
       return;
     }
 
@@ -38,6 +44,10 @@ export function UploadQuestionnaireForm() {
       form.set("contactName", contactName.trim());
       form.set("contactEmail", contactEmail.trim());
       form.set("file", file);
+      if (auditMeta && auditReview) {
+        form.set("auditReportMeta", JSON.stringify(auditMeta));
+        form.set("auditReportReview", JSON.stringify(auditReview));
+      }
 
       const res = await fetch("/api/submissions/upload", {
         method: "POST",
@@ -91,6 +101,11 @@ export function UploadQuestionnaireForm() {
             onChange={(e) => setContactEmail(e.target.value)}
             autoComplete="email"
           />
+          {contactEmail.trim() && !isContactEmailValid(contactEmail) ? (
+            <span className="mt-1 block text-xs font-normal text-amber-700 dark:text-amber-300">
+              Enter a valid email
+            </span>
+          ) : null}
         </label>
       </div>
 
@@ -104,6 +119,19 @@ export function UploadQuestionnaireForm() {
         />
       </label>
 
+      <AuditReportUpload
+        meta={auditMeta}
+        review={auditReview}
+        onUploaded={(meta, review) => {
+          setAuditMeta(meta);
+          setAuditReview(review);
+        }}
+        onClear={() => {
+          setAuditMeta(undefined);
+          setAuditReview(undefined);
+        }}
+      />
+
       {err ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
           {err}
@@ -113,8 +141,8 @@ export function UploadQuestionnaireForm() {
       <div className="flex flex-wrap items-center gap-4">
         <button
           type="submit"
-          disabled={busy}
-          className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-6 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+          disabled={busy || !contactInfoValid}
+          className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-6 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
         >
           {busy ? "Uploading and analyzing…" : "Submit uploaded questionnaire"}
         </button>

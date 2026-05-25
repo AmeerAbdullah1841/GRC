@@ -1,5 +1,6 @@
 "use client";
 
+import { AuditReportUpload } from "@/components/audit-report-upload";
 import type {
   AuthMethod,
   DataSubcategory,
@@ -251,6 +252,21 @@ export function Section3({ data, set }: P) {
         label="Automatic logoff / lock / session timeout after inactivity? (3.14)"
         value={s.sessionTimeout}
         onChange={(v) => u({ sessionTimeout: v })}
+      />
+      <AuditReportUpload
+        meta={data.auditReportMeta}
+        review={data.auditReportReview}
+        onUploaded={(meta, review) =>
+          set((d) => ({ ...d, auditReportMeta: meta, auditReportReview: review }))
+        }
+        onClear={() =>
+          set((d) => {
+            const next = { ...d };
+            delete next.auditReportMeta;
+            delete next.auditReportReview;
+            return next;
+          })
+        }
       />
     </div>
   );

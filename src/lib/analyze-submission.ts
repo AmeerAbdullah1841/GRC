@@ -1,3 +1,4 @@
+import type { StoredAuditReportReview } from "@/lib/audit-report-types";
 import { buildChecklistInterpretation, computeHeuristicDomainScores } from "@/lib/domain-risk-scores";
 import { buildChecklistRecommendationRationale } from "@/lib/recommendation-rationale";
 import { optionalLlmDocumentReview } from "@/lib/llm-document-review";
@@ -50,9 +51,13 @@ export type ParsedStoredAnalysis = {
   institutionalInterpretation: string | null;
   recommendationRationale: string | null;
   meta: AnalysisMeta | null;
+  auditReportReview: StoredAuditReportReview | null;
 };
 
-export function serializeAnalysisForStorage(result: AnalysisResult): string {
+export function serializeAnalysisForStorage(
+  result: AnalysisResult,
+  auditReportReview?: StoredAuditReportReview | null,
+): string {
   return JSON.stringify({
     version: 2,
     factors: result.factors,
@@ -60,6 +65,7 @@ export function serializeAnalysisForStorage(result: AnalysisResult): string {
     institutionalInterpretation: result.institutionalInterpretation,
     recommendationRationale: result.recommendationRationale,
     meta: result.analysisMeta,
+    auditReportReview: auditReportReview ?? undefined,
   });
 }
 
@@ -74,6 +80,7 @@ export function parseStoredAnalysis(raw: string): ParsedStoredAnalysis {
         institutionalInterpretation: null,
         recommendationRationale: null,
         meta: null,
+        auditReportReview: null,
       };
     }
     if (j && typeof j === "object" && "version" in j && (j as { version?: number }).version === 2) {
@@ -83,7 +90,18 @@ export function parseStoredAnalysis(raw: string): ParsedStoredAnalysis {
         institutionalInterpretation?: string;
         recommendationRationale?: string;
         meta?: AnalysisMeta;
+        auditReportReview?: StoredAuditReportReview;
       };
+      const audit = o.auditReportReview;
+      const validAudit =
+        audit &&
+        typeof audit === "object" &&
+        typeof audit.fileName === "string" &&
+        typeof audit.summary === "string" &&
+        typeof audit.compliancePosture === "string" &&
+        Array.isArray(audit.factors)
+          ? audit
+          : null;
       return {
         factors: Array.isArray(o.factors) ? o.factors : [],
         domainScores: o.domainScores && typeof o.domainScores === "object" ? o.domainScores : null,
@@ -92,6 +110,7 @@ export function parseStoredAnalysis(raw: string): ParsedStoredAnalysis {
         recommendationRationale:
           typeof o.recommendationRationale === "string" ? o.recommendationRationale : null,
         meta: o.meta && typeof o.meta === "object" ? o.meta : null,
+        auditReportReview: validAudit,
       };
     }
   } catch {
@@ -103,6 +122,7 @@ export function parseStoredAnalysis(raw: string): ParsedStoredAnalysis {
     institutionalInterpretation: null,
     recommendationRationale: null,
     meta: null,
+    auditReportReview: null,
   };
 }
 

@@ -1,3 +1,4 @@
+import { AdminAuditReportReview } from "@/components/admin-audit-report-review";
 import { AdminDomainRatings } from "@/components/admin-domain-ratings";
 import { AdminQuestionnaireReview } from "@/components/admin-questionnaire-review";
 import { AdminRequestActions } from "@/components/admin-request-actions";
@@ -57,6 +58,7 @@ export default async function AdminRequestDetailPage({ params, searchParams }: P
   const interpretation = parsed.institutionalInterpretation?.trim() || null;
   const recommendationRationale = parsed.recommendationRationale?.trim() || null;
   const analysisMeta = parsed.meta;
+  const auditReportReview = parsed.auditReportReview;
   const hasOpenAiReview = Boolean(analysisMeta?.hasLlmLayer);
   const uploadedDocument = answers ? isDocumentUpload(answers) : false;
 
@@ -92,7 +94,11 @@ export default async function AdminRequestDetailPage({ params, searchParams }: P
           ) : null}
 
           {domainScores ? <AdminDomainRatings domainScores={domainScores} /> : null}
+
+          {auditReportReview ? <AdminAuditReportReview review={auditReportReview} /> : null}
         </>
+      ) : auditReportReview ? (
+        <AdminAuditReportReview review={auditReportReview} />
       ) : null}
 
       <details className="rounded-xl border border-zinc-200 dark:border-zinc-800">
@@ -137,6 +143,9 @@ export default async function AdminRequestDetailPage({ params, searchParams }: P
             Submitted {row.createdAt.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" })}
             {uploadedDocument && answers?.uploadMeta ? (
               <> · Document upload: {answers.uploadMeta.fileName}</>
+            ) : null}
+            {answers?.auditReportMeta ? (
+              <> · Audit report: {answers.auditReportMeta.fileName}</>
             ) : null}
           </p>
         </header>

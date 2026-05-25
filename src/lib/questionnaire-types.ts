@@ -1,4 +1,8 @@
 /** Subcategories under non-public university information (Section 1.1) */
+import type { AuditReportMeta, AuditReportReview } from "@/lib/audit-report-types";
+
+export type { AuditReportMeta, AuditReportReview };
+
 export type DataSubcategory =
   | "pii"
   | "ferpa"
@@ -49,6 +53,8 @@ export type DocumentUploadMeta = {
 
 export type QuestionnaireAnswers = {
   uploadMeta?: DocumentUploadMeta;
+  auditReportMeta?: AuditReportMeta;
+  auditReportReview?: AuditReportReview;
   section1: {
     involvesNonPublic: boolean;
     subcategories: DataSubcategory[];
