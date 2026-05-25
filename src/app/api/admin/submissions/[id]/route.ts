@@ -54,3 +54,19 @@ export async function PATCH(req: Request, ctx: Params) {
     emailError: emailResult.error ?? null,
   });
 }
+
+export async function DELETE(_req: Request, ctx: Params) {
+  const ok = await getAdminSession();
+  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await ctx.params;
+
+  const existing = await prisma.submission.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: "Submission not found." }, { status: 404 });
+  }
+
+  await prisma.submission.delete({ where: { id } });
+
+  return NextResponse.json({ ok: true });
+}
